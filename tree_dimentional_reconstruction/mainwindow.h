@@ -3,6 +3,7 @@
 #include"help.h"
 #include"feature_deal.h"
 #include"Camera.h"
+#include"delaunay.h"
 #include <QMainWindow>
 
 namespace Ui {

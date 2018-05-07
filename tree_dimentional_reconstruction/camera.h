@@ -8,6 +8,7 @@ public:
     Camera();
     cv::Mat in_matrix;          //内参矩阵
     cv::Mat distortion_coeffs;  //畸变参数
+    void calibrate(std::vector<std::string> filelist); //根据棋盘格计算内参
 };
 
 #endif // CAMERA_H

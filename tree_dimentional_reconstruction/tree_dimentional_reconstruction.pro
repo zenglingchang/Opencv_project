@@ -27,13 +27,15 @@ SOURCES += \
         main.cpp \
         mainwindow.cpp \
     feature_deal.cpp \
-    camera.cpp
+    camera.cpp \
+    delaunay.cpp
 
 HEADERS += \
         mainwindow.h \
     feature_deal.h \
     help.h \
-    camera.h
+    camera.h \
+    delaunay.h
 
 FORMS += \
         mainwindow.ui
