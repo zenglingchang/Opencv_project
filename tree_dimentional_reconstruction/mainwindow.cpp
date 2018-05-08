@@ -43,7 +43,7 @@ void MainWindow::on_pushButton_clicked()
 {
     //棋盘图路径
     std::vector<string> filelist;
-    for(int i=0;i<12;i++){
+    for(int i=0;i<13;i++){
         filelist.push_back(string("C:\\Users\\77470\\Desktop\\Data_mining\\chess")+QString::number(i+1).toStdString()+".jpg");
     }
     camera.calibrate(filelist);
@@ -56,7 +56,7 @@ void MainWindow::on_pushButton_2_clicked()
     cv::resize(im1,tex,cv::Size(1024,1024),0,0,INTER_AREA);
     cv::imwrite("D:\\Vs_project\\OpenGL_project\\Opengl-version1.0\\Opengl-version1.0\\texture.jpg",tex);
     Feature_Deal test1(im1),test2(im2);
-    cv::Rect rec(226,126,570-226,457-126);
+    cv::Rect rec(0,0,im1.cols,im1.rows);
     cv::rectangle(im1,rec,cv::Scalar::all(255));
     cv::imshow("im1",im1);
     std::vector<cv::Point2f> p1,p2;
@@ -85,36 +85,44 @@ void MainWindow::on_pushButton_2_clicked()
     }
     qDebug()<<"pass_rate: "<<((double)pass_count) / feasible_count;
     //两个相机的投影矩阵[R T]，triangulatePoints只支持float型
-    Mat proj1(3, 4, CV_32FC1);
-    Mat proj2(3, 4, CV_32FC1);
+    Mat proj1(3, 4, CV_64FC1);
+    Mat proj2(3, 4, CV_64FC1);
 
-    proj1(Range(0, 3), Range(0, 3)) = Mat::eye(3, 3, CV_32FC1);
-    proj1.col(3) = Mat::zeros(3, 1, CV_32FC1);
+    proj1(Range(0, 3), Range(0, 3)) = Mat::eye(3, 3, CV_64FC1);
+    proj1.col(3) = Mat::zeros(3, 1, CV_64FC1);
 
-    R.convertTo(proj2(Range(0, 3), Range(0, 3)), CV_32FC1);
-    T.convertTo(proj2.col(3), CV_32FC1);
-
+    R.convertTo(proj2(Range(0, 3), Range(0, 3)), CV_64FC1);
+    T.convertTo(proj2.col(3), CV_64FC1);
+    qDebug()<<"R T:"<<endl;
+    for(int s=0;s<3;s++)
+        qDebug()<<R.at<double>(s,0)<<R.at<double>(s,1)<<R.at<double>(s,2)<<T.at<double>(s,0);
+    qDebug()<<endl;
     Mat fK,structure;
-    camera.in_matrix.convertTo(fK, CV_32FC1);
+    camera.in_matrix.convertTo(fK, CV_64FC1);
     proj1 = fK*proj1;
     proj2 = fK*proj2;
+
     vector<cv::Point3f> Points3d;
     //三角化重建
-    triangulatePoints(proj1, proj2, temp1, temp2, structure);
+//    triangulatePoints(proj1, proj2, temp1, temp2, structure);
+    calc3Dpts(temp1,temp2,proj1,proj2,Points3d);
     i=0;
-    float x,y,z,w;
-    for(cv::Mat_<float>::iterator it=structure.begin<float>(),itend=structure.end<float>();it!=itend;){
-        x=*(it),y=*(it+1),z=*(it+2),w=*(it+3);
-        it+=4;
-        qDebug()<<x/w<<", "<<y/w<<", "<<z/w<<", "<<temp1[i].x/im1.cols<<","<<1-temp1[i].y/im1.rows<<",";
-        i++;
-        Points3d.push_back(cv::Point3f(x/w,y/w,z/w));
+//    float x,y,z,w;
+//    for(cv::Mat_<float>::iterator it=structure.begin<float>(),itend=structure.end<float>();it!=itend;){
+//        x=*(it),y=*(it+1),z=*(it+2),w=*(it+3);
+//        it+=4;
+//        qDebug()<<x/w<<", "<<y/w<<", "<<z/w<<", "<<temp1[i].x/im1.cols<<","<<1-temp1[i].y/im1.rows<<",";
+//        i++;
+//        Points3d.push_back(cv::Point3f(x/w,y/w,z/w));
+//    }
+//    qDebug()<<i;
+    for(i=0;i<temp1.size();i++){
+        qDebug()<<Points3d[i].x<<","<<Points3d[i].y<<","<<Points3d[i].z<<","<<temp1[i].x/im1.cols<<","<<1-temp1[i].y/im1.rows<<",";
     }
-    qDebug()<<i;
-    fstream file("D:\\qt_project\\tree_dimensional_reconstruction\\tree_dimentional_reconstruction\\model.txt");
+    fstream file("D:\\qt_project\\tree_dimensional_reconstruction\\tree_dimentional_reconstruction\\model.obj");
     if(file){
         for(cv::Point3f pt:Points3d)
-            file<<"v "<<pt.x<<" "<<pt.y<<" "<<pt.z<<endl;
+            file<<"v "<<pt.x<<" "<<-pt.y<<" "<<pt.z<<endl;
         for(cv::Point2f pt:temp1)
             file<<"uv "<<pt.x/im1.cols<<" "<<1-pt.y/im1.rows<<endl;
         file.close();

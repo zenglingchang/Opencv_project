@@ -21,7 +21,7 @@ void Delaunay::drawDelaunay(Mat &src, Mat &dst, Scalar delaunay_color)
     subdiv.getTriangleList(TriangleLists);
     std::vector<cv::Point2f> pt(3);
     qDebug()<<"Triangle size: "<<TriangleLists.size();
-    fstream file("D:\\qt_project\\tree_dimensional_reconstruction\\tree_dimentional_reconstruction\\model.txt",ios::app);
+    fstream file("D:\\qt_project\\tree_dimensional_reconstruction\\tree_dimentional_reconstruction\\model.obj",ios::app);
     for(size_t i=0;i<TriangleLists.size();i++){
         Vec6f t=TriangleLists[i];
         pt[0]=cv::Point2f(t[0],t[1]);
