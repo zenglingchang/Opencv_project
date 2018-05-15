@@ -72,4 +72,6 @@ void Camera::calibrate(std::vector<string> filelist)
     qDebug()<<"内参矩阵: ";
     for(int i=0;i<3;i++)
         qDebug()<<in_matrix.at<double>(i,0)<<"\t"<<in_matrix.at<double>(i,1)<<"\t"<<in_matrix.at<double>(i,2)<<"  ";
+    focal_length=0.5*(in_matrix.at<double>(0) + in_matrix.at<double>(4));
+    principle_point=Point2d(in_matrix.at<double>(2), in_matrix.at<double>(5));
 }

@@ -43,95 +43,42 @@ void MainWindow::on_pushButton_clicked()
 {
     //棋盘图路径
     std::vector<string> filelist;
-    for(int i=0;i<13;i++){
+    for(int i=0;i<12;i++){
         filelist.push_back(string("C:\\Users\\77470\\Desktop\\Data_mining\\chess")+QString::number(i+1).toStdString()+".jpg");
     }
-    camera.calibrate(filelist);
+    struc.calculate_Camera(filelist);
 }
 
 void MainWindow::on_pushButton_2_clicked()
 {
-    cv::Mat im1=cv::imread("C:\\Users\\77470\\Desktop\\Data_mining\\test2.jpg"),
-            im2=cv::imread("C:\\Users\\77470\\Desktop\\Data_mining\\test1.jpg"),tex;
-    cv::resize(im1,tex,cv::Size(1024,1024),0,0,INTER_AREA);
-    cv::imwrite("D:\\Vs_project\\OpenGL_project\\Opengl-version1.0\\Opengl-version1.0\\texture.jpg",tex);
-    Feature_Deal test1(im1),test2(im2);
-    cv::Rect rec(0,0,im1.cols,im1.rows);
-    cv::rectangle(im1,rec,cv::Scalar::all(255));
-    cv::imshow("im1",im1);
-    std::vector<cv::Point2f> p1,p2;
-    match_feature(test1,test2,p1,p2,rec);
-    //通过内参矩阵求焦距及光心
-    double focal_length = 0.5*(camera.in_matrix.at<double>(0) + camera.in_matrix.at<double>(4));
-    Point2d principle_point(camera.in_matrix.at<double>(2), camera.in_matrix.at<double>(5));
-    qDebug()<<"f: "<<focal_length<<" center: "<<principle_point.x<<" , "<<principle_point.y;
-    Mat mask;
-    cv::Mat E=cv::findEssentialMat(p1,p2,focal_length,principle_point,RANSAC,0.999,1.0,mask);
-    double feasible_count = countNonZero(mask);
-    qDebug() << (int)feasible_count << " -in- " << p1.size();
-    cv::Mat R,T;
-    int pass_count = recoverPose(E, p1, p2,R , T, focal_length, principle_point, mask);
-    std::vector<cv::Point2f> temp1,temp2;
-    int j=0,i=0;
-    for(cv::Mat_<uchar>::iterator it=mask.begin<uchar>(),itend=mask.end<uchar>();it!=itend;it++){
-        if(*it==1)
-        {
-            temp1.push_back(p1[j]);
-            temp2.push_back(p2[j]);
-            qDebug()<<"p1: ( "<<p1[j].x<<" , "<<p1[j].y<<" ) p2: ( "
-               <<p2[j].x<<" , "<<p2[j].y<<" )";
-        }
-        j++;
-    }
-    qDebug()<<"pass_rate: "<<((double)pass_count) / feasible_count;
-    //两个相机的投影矩阵[R T]，triangulatePoints只支持float型
-    Mat proj1(3, 4, CV_64FC1);
-    Mat proj2(3, 4, CV_64FC1);
+    std::vector<string> ImageNameList;
+    for(int i=0;i<16;i++)
+        ImageNameList.push_back("C:\\Users\\77470\\Desktop\\Data_mining\\test"+QString::number(i+1).toStdString()+".jpg");
+    struc.SetImage(ImageNameList);
+}
 
-    proj1(Range(0, 3), Range(0, 3)) = Mat::eye(3, 3, CV_64FC1);
-    proj1.col(3) = Mat::zeros(3, 1, CV_64FC1);
+void MainWindow::on_pushButton_3_clicked()
+{
+    struc.BuildFace();
+    qDebug()<<"BuildFace Complete!";
+    struc.OutputToFile();
+    qDebug()<<"Print To File Complete!";
+}
 
-    R.convertTo(proj2(Range(0, 3), Range(0, 3)), CV_64FC1);
-    T.convertTo(proj2.col(3), CV_64FC1);
-    qDebug()<<"R T:"<<endl;
-    for(int s=0;s<3;s++)
-        qDebug()<<R.at<double>(s,0)<<R.at<double>(s,1)<<R.at<double>(s,2)<<T.at<double>(s,0);
-    qDebug()<<endl;
-    Mat fK,structure;
-    camera.in_matrix.convertTo(fK, CV_64FC1);
-    proj1 = fK*proj1;
-    proj2 = fK*proj2;
+void MainWindow::on_pushButton_4_clicked()
+{
+    struc.AddStruct(front);
+    qDebug()<<"AddStruct Complete!";
+}
 
-    vector<cv::Point3f> Points3d;
-    //三角化重建
-//    triangulatePoints(proj1, proj2, temp1, temp2, structure);
-    calc3Dpts(temp1,temp2,proj1,proj2,Points3d);
-    i=0;
-//    float x,y,z,w;
-//    for(cv::Mat_<float>::iterator it=structure.begin<float>(),itend=structure.end<float>();it!=itend;){
-//        x=*(it),y=*(it+1),z=*(it+2),w=*(it+3);
-//        it+=4;
-//        qDebug()<<x/w<<", "<<y/w<<", "<<z/w<<", "<<temp1[i].x/im1.cols<<","<<1-temp1[i].y/im1.rows<<",";
-//        i++;
-//        Points3d.push_back(cv::Point3f(x/w,y/w,z/w));
-//    }
-//    qDebug()<<i;
-    for(i=0;i<temp1.size();i++){
-        qDebug()<<Points3d[i].x<<","<<Points3d[i].y<<","<<Points3d[i].z<<","<<temp1[i].x/im1.cols<<","<<1-temp1[i].y/im1.rows<<",";
-    }
-    fstream file("D:\\qt_project\\tree_dimensional_reconstruction\\tree_dimentional_reconstruction\\model.obj");
-    if(file){
-        for(cv::Point3f pt:Points3d)
-            file<<"v "<<pt.x<<" "<<-pt.y<<" "<<pt.z<<endl;
-        for(cv::Point2f pt:temp1)
-            file<<"uv "<<pt.x/im1.cols<<" "<<1-pt.y/im1.rows<<endl;
-        file.close();
-    }
-    else
-        qDebug()<<"file does not exist!";
-    Mat dst;
-    Delaunay delaunay(rec);
-    delaunay.insert(temp1);
-    delaunay.drawDelaunay(im1,dst,Scalar::all(255));
-    cv::imshow("dst",dst);
+
+void MainWindow::on_pushButton_5_clicked()
+{
+    struc.AddStruct(mid);
+    qDebug()<<"AddStruct Complete!";
+}
+void MainWindow::on_pushButton_6_clicked()
+{
+    struc.AddStruct(back);
+    qDebug()<<"AddStruct Complete!";
 }

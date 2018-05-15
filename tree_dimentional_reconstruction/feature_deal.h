@@ -14,7 +14,6 @@ public:
     //cv::xfeatures2d::SIFT::create(); SIFT特诊检测器
     cv::Mat image;
 };
-void calc3Dpts(vector<Point2f> &pr, vector<Point2f> &pl,Mat &MR,Mat &ML, vector<Point3f> &pts);
-void match_feature(Feature_Deal &a,Feature_Deal &b,vector<Point2f>& p1,
-                   vector<Point2f>& p2,cv::Rect );
+cv::Mat match_feature(Feature_Deal &a,Feature_Deal &b,vector<Point2f>& p1,
+                   vector<Point2f>& p2,cv::Rect rec1,cv::Rect rec2);
 #endif // FEATURE_DEAL_H

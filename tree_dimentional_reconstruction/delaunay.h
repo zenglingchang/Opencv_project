@@ -11,6 +11,7 @@ public:
     Delaunay(cv::Rect rect);
     void insert(std::vector<cv::Point2f> &Points);
     void drawDelaunay(cv::Mat &src,cv::Mat &dst,Scalar);
+    void GetFace(std::vector<int> &FaceList);
 };
 
 #endif // DELAUNAY_H
