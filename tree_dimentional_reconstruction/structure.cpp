@@ -12,6 +12,7 @@ structure::structure()
            cv::Rect(54,56,898-54,522-56),cv::Rect(0,62,950,557-62)};
 }
 
+//设置图像并提取特征
 void structure::SetImage(std::vector<string> ImageNameList)
 {
     int ratio,i=0;
@@ -21,9 +22,10 @@ void structure::SetImage(std::vector<string> ImageNameList)
     FaceList.resize(ImageNum);
     Rotations.resize(ImageNum);
     Motions.resize(ImageNum);
+    Ratios.resize(ImageNum);
     for(string ImageName:ImageNameList){
         image=cv::imread(ImageName);
-        ratio=std::sqrt((image.cols*image.rows)/1000000);
+        ratio=std::sqrt((image.cols*image.rows)/500000);
         cv::resize(image,tex,cv::Size(1024,1024),0,0,INTER_AREA);
         cv::imwrite("D:\\Vs_project\\OpenGL_project\\Opengl-version1.0\\Opengl-version1.0\\texture" +
                     QString::number(i++).toStdString()+".jpg",tex);
@@ -34,20 +36,22 @@ void structure::SetImage(std::vector<string> ImageNameList)
     rect=Rect(0,0,image.cols,image.rows);
 }
 
+//计算相机内参
 void structure::calculate_Camera(std::vector<string> filenamelist)
 {
     camera.calibrate(filenamelist);
 }
 
-void structure::init(int begin)
+//初始化，提取本质矩阵来获取RT
+bool structure::init(int begin,int end)
 {
     if(ImageList.size()<2){
         qDebug()<<"至少需要两张图";
-        return;
+        return false;
     }
     //特征匹配
     vector<cv::Point2f> p1,p2,temp1,temp2;
-    cv::imshow("match_begin",match_feature(FeatrueList[begin],FeatrueList[begin+1],p1,p2,rects[begin],rects[begin+1]));
+    cv::imshow("match "+QString::number(begin).toStdString()+" - "+QString::number(end).toStdString(),match_feature(FeatrueList[begin],FeatrueList[end],p1,p2,rect,rect));
     cv::Mat mask;
 
     //本征矩阵及提取旋转平移矩阵
@@ -63,30 +67,31 @@ void structure::init(int begin)
     }
     Rotations[begin]=Mat::eye(3, 3, CV_64FC1);
     Motions[begin]=Mat::zeros(3,1,CV_64FC1);
-    Rotations[begin+1]=R;
-    Motions[begin+1]=T;
+    Rotations[end]=R;
+    Motions[end]=T;
 
     //三角重建
     vector<Point3f> Points3D;
-    reconstruct(Rotations[begin],Motions[begin],Rotations[begin+1],Motions[begin+1],temp1,temp2,Points3D);
+    reconstruct(Rotations[begin],Motions[begin],Rotations[end],Motions[end],temp1,temp2,Points3D);
 
     //添加映射
     for(int i=0;i<Points3D.size();i++){
         Points2D_All[begin].push_back(temp1[i]);
-        Points2D_All[begin+1].push_back(temp2[i]);
+        Points2D_All[end].push_back(temp2[i]);
         Points3D_All.push_back(Points3D[i]);
         PointsMap[TexturePoint(begin,temp1[i])]=Points3D_All.size()-1;
-        PointsMap[TexturePoint(begin+1,temp2[i])]=Points3D_All.size()-1;
+        PointsMap[TexturePoint(end,temp2[i])]=Points3D_All.size()-1;
     }
+    return true;
 }
 
-void structure::Filter(vector<Point2f> &p1, vector<Point2f> &p2,cv::Mat &R,cv::Mat &T)
+void structure::Filter(vector<Point2f> &p1, vector<Point2f> &p2)
 {
     vector<Point2f> temp1,temp2;
     cv::Mat mask;
     //本征矩阵
     cv::Mat E=cv::findEssentialMat(p1,p2,camera.focal_length,camera.principle_point,RANSAC,0.999,1.0,mask);
-    recoverPose(E, p1, p2,R , T, camera.focal_length, camera.principle_point,mask);
+//    recoverPose(E, p1, p2,R , T, camera.focal_length, camera.principle_point,mask);
     int j=0;
     for(cv::Mat_<uchar>::iterator it=mask.begin<uchar>(),itend=mask.end<uchar>();it!=itend;it++){
         if(*it==1){
@@ -99,7 +104,7 @@ void structure::Filter(vector<Point2f> &p1, vector<Point2f> &p2,cv::Mat &R,cv::M
     p2=temp2;
 }
 
-void structure::AddStruct(STATU statu)
+void structure::AddStruct(STATU statu,bool flag)
 {
     clear();
     int begin;
@@ -109,16 +114,18 @@ void structure::AddStruct(STATU statu)
         begin=(ImageNum-1)/2;
     else
         begin=ImageNum-2;
-    init(begin);
-    qDebug()<<"init Complete!";
     //以中间图像为开始
     //对中间图像后的图像进行匹配
+    if(!init(begin,begin+1))
+        return;
+    qDebug()<<"init Complete!";
+    LeastSquare leastsquare;
     for(int i=begin+1;i<ImageNum-1;i++){
-        cv::Mat r,T,R;
+        cv::Mat r=cv::Mat::zeros(3, 1, CV_64FC1),T=cv::Mat::zeros(3, 1, CV_64FC1),R;
         vector<cv::Point2f> p1,p2,temp1,temp2,ImagePoints;
         vector<cv::Point3f> ObjectPoints;
-        cv::imshow("match + "+QString::number(i).toStdString(),match_feature(FeatrueList[i],FeatrueList[i+1],p1,p2,rects[i],rects[i+1]));
-        Filter(p1,p2,R,T);
+        cv::imshow("match "+QString::number(i).toStdString()+" - "+QString::number(i+1).toStdString(),match_feature(FeatrueList[i],FeatrueList[i+1],p1,p2,rect,rect));
+        Filter(p1,p2);
 
         int Index,FindNumber=0;
         TexturePoint TempTexturePoint;
@@ -129,7 +136,7 @@ void structure::AddStruct(STATU statu)
                 ImagePoints.push_back(p2[j]);                           //加入图像点集
                 Points2D_All[i+1].push_back(p2[j]);
                 PointsMap[TexturePoint(i+1,p2[j])]=Index;
-                qDebug()<<p1[j].x<<" "<<p1[j].y<<"  "<<Index;
+//                qDebug()<<p1[j].x<<" "<<p1[j].y<<"  "<<Index;
                 FindNumber++;
             }
             else{                                                       //
@@ -139,9 +146,12 @@ void structure::AddStruct(STATU statu)
         }
         qDebug()<<"Find 3D Points Complete!";
         if(FindNumber>4){
-            solvePnPRansac(ObjectPoints,ImagePoints,camera.in_matrix,camera.distortion_coeffs,r,T);
-            Rodrigues(r, R);
+            solvePnPRansac(ObjectPoints,ImagePoints,camera.in_matrix,camera.distortion_coeffs,r,T,true,700,4.991,0.999);
             qDebug()<<"match_feature "<<i+1<<" and "<<i+2<<" complete!";
+            qDebug()<<T.at<double>(0,0)<<"\t"<<T.at<double>(0,1)<<"\t"<<T.at<double>(0,2)<<"\t"<<T.at<double>(i,3);
+            qDebug()<<r.at<double>(0,0)<<"\t"<<r.at<double>(0,1)<<"\t"<<r.at<double>(0,2)<<"\t"<<r.at<double>(i,3);
+            if(flag)leastsquare(r,T,camera.in_matrix,ImagePoints,ObjectPoints);
+            Rodrigues(r, R);
         }
         else{
             qDebug()<<"match_feature "<<i+1<<" and "<<i+2<<" fail!";
@@ -155,7 +165,7 @@ void structure::AddStruct(STATU statu)
         Point3f zero(0.0,0.0,0.0);
         //添加映射
         for(int j=0;j<Points3D.size();j++){
-            if(d(Points3D[j],zero)>14)
+            if(d(Points3D[j],zero)>15)
                 continue;
             Points2D_All[i].push_back(temp1[j]);
             Points2D_All[i+1].push_back(temp2[j]);
@@ -167,22 +177,22 @@ void structure::AddStruct(STATU statu)
 
     //对中间图像前的图像进行匹配
     for(int i=begin;i>0;i--){
-        cv::Mat r,T,R;
+        cv::Mat r=cv::Mat::zeros(3, 1, CV_64FC1),T=cv::Mat::zeros(3, 1, CV_64FC1),R;
         vector<cv::Point2f> p1,p2,temp1,temp2,ImagePoints;
         vector<cv::Point3f> ObjectPoints;
-        cv::imshow("match -"+QString::number(i).toStdString(),match_feature(FeatrueList[i-1],FeatrueList[i],p1,p2,rects[i-1],rects[i]));
-        Filter(p1,p2,R,T);
+        cv::imshow("match -"+QString::number(i-1).toStdString()+" - "+QString::number(i).toStdString(),match_feature(FeatrueList[i-1],FeatrueList[i],p1,p2,rect,rect));
+        Filter(p1,p2);
 
         int Index,FindNumber=0;
         TexturePoint TempTexturePoint;
-        for(int j=0;j<p1.size();j++){
+        for(int j=0;j<p2.size();j++){
             TempTexturePoint=TexturePoint(i,p2[j]);
             if(FindPoint3dIndex(TempTexturePoint,PointsMap,Index)){     //当前点如果存在空间点
-                ObjectPoints.push_back(Points3D_All[Index]);            //加入三维点集
-                ImagePoints.push_back(p1[j]);                           //加入图像点集
+                ObjectPoints.push_back(Point3d(Points3D_All[Index]));            //加入三维点集
+                ImagePoints.push_back(Point2d(p1[j]));                           //加入图像点集
                 Points2D_All[i-1].push_back(p1[j]);
                 PointsMap[TexturePoint(i-1,p1[j])]=Index;
-                qDebug()<<p1[j].x<<" "<<p1[j].y<<"  "<<Index;
+//                qDebug()<<p1[j].x<<" "<<p1[j].y<<"  "<<Index;
                 FindNumber++;
             }
             else{                                                       //
@@ -192,12 +202,17 @@ void structure::AddStruct(STATU statu)
         }
         qDebug()<<"Find 3D Points Complete!";
         if(FindNumber>4){
-            solvePnPRansac(ObjectPoints,ImagePoints,camera.in_matrix,camera.distortion_coeffs,r,T);
+            solvePnPRansac(ObjectPoints,ImagePoints,camera.in_matrix,camera.distortion_coeffs,r,T,true,700,4.991,0.999);
+//            qDebug()<<r.type()<<"T "<<T.type();
+            qDebug()<<T.at<double>(0,0)<<"\t"<<T.at<double>(0,1)<<"\t"<<T.at<double>(0,2)<<"\t"<<T.at<double>(i,3);
+
+            qDebug()<<r.at<double>(0,0)<<"\t"<<r.at<double>(0,1)<<"\t"<<r.at<double>(0,2)<<"\t"<<r.at<double>(i,3);
+            if(flag)leastsquare(r,T,camera.in_matrix,ImagePoints,ObjectPoints);
             Rodrigues(r, R);
-            qDebug()<<"match_feature "<<i+1<<" and "<<i<<" complete!";
+            qDebug()<<"match_feature "<<i<<" and "<<i+1<<" complete!";
         }
         else{
-            qDebug()<<"match_feature "<<i+1<<" and "<<i<<" fail!";
+            qDebug()<<"match_feature "<<i<<" and "<<i+1<<" fail!";
             continue;
         }
         Rotations[i-1]=R;
@@ -208,7 +223,7 @@ void structure::AddStruct(STATU statu)
         Point3f zero(0.0,0.0,0.0);
         //添加映射
         for(int j=0;j<Points3D.size();j++){
-            if(d(Points3D[j],zero)>14)
+            if(d(Points3D[j],zero)>15)
                 continue;
             Points2D_All[i-1].push_back(temp1[j]);
             Points2D_All[i].push_back(temp2[j]);
@@ -223,15 +238,30 @@ void structure::AddStruct(STATU statu)
 
 void structure::BuildFace()
 {
+    cv::Mat dst;
     for(int i=1;i<ImageNum-1;i++){
         Delaunay delaunay(rect);
-        delaunay.insert(Points2D_All[i]);
-        delaunay.GetFace(FaceList[i]);
+        vector<Point3f> PointsBuffer;
+//        qDebug()<<"ObjectPoints!";
+        for(int j=0;j<Points2D_All[i].size();j++)
+            PointsBuffer.push_back(Points3D_All[PointsMap[TexturePoint(i,Points2D_All[i][j])]]);
+//        qDebug()<<"ObjectPoints!";
+        delaunay.insert(Points2D_All[i],PointsBuffer);
+        delaunay.GetFace(ImageList[i],dst,FaceList[i]);
+        Ratios[i]=delaunay.GetRatio();
+        cv::imshow("Delaunay"+QString::number(i).toStdString(),dst);
     }
 }
 
+
 void structure::OutputToFile()
 {
+    cv::Mat quadrangle[4],answer[4];
+    quadrangle[0]=(Mat_<double>(4,1)<<-0.2,0.2,0,1);
+    quadrangle[1]=(Mat_<double>(4,1)<<0.2,0.2,0,1);
+    quadrangle[2]=(Mat_<double>(4,1)<<0.2,-0.2,0,1);
+    quadrangle[3]=(Mat_<double>(4,1)<<-0.2,-0.2,0,1);
+    qDebug()<<"quadrangle";
     map<Face,int> FaceMap;
     ofstream file("D:\\qt_project\\tree_dimensional_reconstruction\\tree_dimentional_reconstruction\\model.obj",std::ios::trunc);
     ofstream file2("D:\\qt_project\\tree_dimensional_reconstruction\\tree_dimentional_reconstruction\\data.txt",std::ios::trunc);
@@ -240,26 +270,26 @@ void structure::OutputToFile()
         for(Point3f p:Points3D_All){
             file<<xx++<<" v "<<p.x<<" "<<p.y<<" "<<p.z<<endl;
         }
-        for(int num=1;num<ImageNum-1;num++)
+        for(int num=1;num<ImageNum-1;num++){
             for(int i=0;i<FaceList[num].size();){
                 Face TempFace(PointsMap[TexturePoint(num,Points2D_All[num][FaceList[num][i]])],
                         PointsMap[TexturePoint(num,Points2D_All[num][FaceList[num][i+1]])],
                         PointsMap[TexturePoint(num,Points2D_All[num][FaceList[num][i+2]])]);
-                qDebug()<<TempFace.F[0]<<TempFace.F[1]<<TempFace.F[2];
+//                qDebug()<<TempFace.F[0]<<TempFace.F[1]<<TempFace.F[2];
                 if(FaceMap.find(TempFace)!=FaceMap.end()){
-                    qDebug()<<"find face!";
+//                    qDebug()<<"find face!";
                     i+=3;
                     continue;
                 }
                 else
                     FaceMap[TempFace]=1;
-                if((d(Points3D_All[TempFace.F[0]],Points3D_All[TempFace.F[1]])>1)||
-                        (d(Points3D_All[TempFace.F[1]],Points3D_All[TempFace.F[2]])>1)||
-                        (d(Points3D_All[TempFace.F[0]],Points3D_All[TempFace.F[2]])>1))
+                if(d(Points3D_All[TempFace.F[0]],Points3D_All[TempFace.F[1]])>1.0||(d(Points3D_All[TempFace.F[0]],Points3D_All[TempFace.F[1]])>1.7*Ratios[num]*d(Points2D_All[num][FaceList[num][i]],Points2D_All[num][FaceList[num][i+1]]))||
+                        d(Points3D_All[TempFace.F[1]],Points3D_All[TempFace.F[2]])>1.0||(d(Points3D_All[TempFace.F[1]],Points3D_All[TempFace.F[2]])>1.7*Ratios[num]*d(Points2D_All[num][FaceList[num][i+1]],Points2D_All[num][FaceList[num][i+2]]))||
+                        d(Points3D_All[TempFace.F[0]],Points3D_All[TempFace.F[2]])>1.0||(d(Points3D_All[TempFace.F[0]],Points3D_All[TempFace.F[2]])>1.7*Ratios[num]*d(Points2D_All[num][FaceList[num][i]],Points2D_All[num][FaceList[num][i+2]])))
                     continue;
                 for(int k=0;k<3;k++){
                     int index=TempFace.F[k];
-                    file2<<Points3D_All[index].x<<" "<<-Points3D_All[index].y<<" "<<Points3D_All[index].z<<" "<<num<<" "
+                    file2<<Points3D_All[index].x<<" "<<-Points3D_All[index].y<<" "<<-Points3D_All[index].z<<" "<<num<<" "
                         <<Points2D_All[num][FaceList[num][i+k]].x/rect.width<<" "<<1-Points2D_All[num][FaceList[num][i+k]].y/rect.height<<endl;
 
             }
@@ -267,12 +297,64 @@ void structure::OutputToFile()
                     <<" "<<PointsMap[TexturePoint(num,Points2D_All[num][FaceList[num][i+1]])]
                     <<" "<<PointsMap[TexturePoint(num,Points2D_All[num][FaceList[num][i+2]])]<<endl;
             i+=3;
+            }
+            cv::Mat proj=GetTranInverse(Rotations[num],Motions[num]);
+            qDebug()<<"proj["<<num<<"]";
+            for(int i=0;i<3;i++)
+                qDebug()<<proj.at<double>(i,0)<<"\t"<<proj.at<double>(i,1)<<"\t"<<proj.at<double>(i,2)<<"\t"<<proj.at<double>(i,3);
+            for(int k=0;k<4;k++){
+                qDebug()<<"quadrangle["<<k<<"]";
+                qDebug()<<quadrangle[k].at<double>(0,0)<<"\t"<<quadrangle[k].at<double>(1,0)<<"\t"<<quadrangle[k].at<double>(2,0)<<"\t"<<quadrangle[k].at<double>(3,0);
+                answer[k]=proj*quadrangle[k];
+                qDebug()<<answer[k].at<double>(0,0)<<"\t"<<answer[k].at<double>(1,0)<<"\t"<<answer[k].at<double>(2,0);
+            }
+
+            file2<<answer[0].at<double>(0,0)<<" "<<answer[0].at<double>(1,0)<<" "<<-answer[0].at<double>(2,0)<<" "<<num<<" "
+                                           <<0.00<<" "<<1.00<<endl;
+            file2<<answer[1].at<double>(0,0)<<" "<<answer[1].at<double>(1,0)<<" "<<-answer[1].at<double>(2,0)<<" "<<num<<" "
+                                           <<1.00<<" "<<1.00<<endl;
+            file2<<answer[2].at<double>(0,0)<<" "<<answer[2].at<double>(1,0)<<" "<<-answer[2].at<double>(2,0)<<" "<<num<<" "
+                                           <<1.00<<" "<<0.00<<endl;
+            file2<<answer[0].at<double>(0,0)<<" "<<answer[0].at<double>(1,0)<<" "<<-answer[0].at<double>(2,0)<<" "<<num<<" "
+                                           <<0.00<<" "<<1.00<<endl;
+            file2<<answer[2].at<double>(0,0)<<" "<<answer[2].at<double>(1,0)<<" "<<-answer[2].at<double>(2,0)<<" "<<num<<" "
+                                           <<1.00<<" "<<0.00<<endl;
+            file2<<answer[3].at<double>(0,0)<<" "<<answer[3].at<double>(1,0)<<" "<<-answer[3].at<double>(2,0)<<" "<<num<<" "
+                                           <<0.00<<" "<<0.00<<endl;
         }
         file.close();
         file2.close();
     }
     else
         qDebug()<<"Open file error!";
+}
+
+Mat structure::GetTranInverse(Mat &R, Mat &tvec)
+{
+    Eigen::Matrix3d r;
+    cv::cv2eigen(R, r);
+    Eigen::Isometry3d T = Eigen::Isometry3d::Identity();
+    Eigen::AngleAxisd angle(r);
+    Eigen::Translation<double, 3> trans(tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2));
+    T = angle;  //3*4
+    T(0,3) = tvec.at<double>(0,0);
+    T(1,3) = tvec.at<double>(1,0);
+    T(2,3) = tvec.at<double>(2,0);
+    Eigen::Quaterniond q(r);//四元数
+    T = angle.inverse();
+    Eigen::Matrix<double,3,1> t;
+    cv::cv2eigen(tvec, t);
+    t = -1 * angle.inverse().matrix() *t;
+    T(0, 3) = t(0);
+    T(1, 3) = t(1);
+    T(2, 3) = t(2);
+    cv::Mat proj(3,4,CV_64FC1);
+    for (int i = 0; i < 3; ++i){
+        for (int j = 0; j < 4; ++j){
+            proj.at<double>(i,j) = T(i, j);
+        }
+    }
+    return proj;
 }
 
 void structure::calc3Dpts(vector<Point2f> &pr, vector<Point2f> &pl, Mat &MR, Mat &ML, vector<Point3f> &pts)
@@ -323,6 +405,7 @@ void structure::reconstruct(Mat &RLeft, Mat &Tleft, Mat &Rright, Mat &Tright, st
     calc3Dpts(Points2Dleft,Points2Dright,proj1,proj2,Points3D);
 }
 
+
 bool FindPoint3dIndex(TexturePoint &p, map<TexturePoint, int> &PointsMap, int &Index)
 {
     auto it=PointsMap.find(p);
@@ -331,14 +414,4 @@ bool FindPoint3dIndex(TexturePoint &p, map<TexturePoint, int> &PointsMap, int &I
         return true;
     }
     return false;
-}
-
-float d(Point2f &p1, Point2f &p2)
-{
-    return std::sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y));
-}
-
-float d(Point3f &p1, Point3f &p2)
-{
-    return std::sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y)+(p1.z-p2.z)*(p1.z-p2.z));
 }

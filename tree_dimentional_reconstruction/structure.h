@@ -4,6 +4,7 @@
 #include"feature_deal.h"
 #include"Camera.h"
 #include"delaunay.h"
+#include"leastsquare.h"
 enum STATU{front,mid,back};
 struct Face{
     int F[3];
@@ -52,13 +53,14 @@ class structure
     std::vector<cv::Mat> Motions;                       //平移矩阵List
     std::vector<std::vector<int>> FaceList;             //三角面片List
     std::vector<cv::Rect> rects;                        //最小外包矩形List
+    std::vector<double> Ratios;                         //三维和二维的比值
 public:
     structure();
     void SetImage(std::vector<string> ImageNameList);           //输入图像
     void calculate_Camera(std::vector<string> filenamelist);    //标定相机
-    void init(int begin);                                                //初始化，以第一幅图为标准建立坐标系
-    void Filter(vector<Point2f> &p1,vector<Point2f> &p2,cv::Mat &R,cv::Mat &T);       //利用RANSAC过滤
-    void AddStruct(STATU statu);                                           //增量添加空间点
+    bool init(int begin,int end);                                                //初始化，以第一幅图为标准建立坐标系
+    void Filter(vector<Point2f> &p1,vector<Point2f> &p2);       //利用RANSAC过滤
+    void AddStruct(STATU statu,bool flag);                                           //增量添加空间点
     void BuildFace();                                           //利用Delaunay算法构造三角面片
     void OutputToFile();
     void clear(){
@@ -70,6 +72,7 @@ public:
             faces.clear();
 
     }
+    cv::Mat GetTranInverse(cv::Mat &R,cv::Mat &tvec);
     //利用三角重建计算三维点坐标
     void calc3Dpts(vector<Point2f> &pr, vector<Point2f> &pl,Mat &MR,Mat &ML, vector<Point3f> &pts);
     //三角重建
@@ -80,6 +83,5 @@ bool FindPoint3dIndex(
         TexturePoint &p,
         map<TexturePoint,int> &PointsMap,
         int &Index);
-float d(Point2f &p1,Point2f &p2);
-float d(Point3f &p1,Point3f &p2);
+
 #endif // STRUCTURE_H
