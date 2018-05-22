@@ -43,7 +43,7 @@ void MainWindow::on_pushButton_clicked()
 {
     //棋盘图路径
     std::vector<string> filelist;
-    for(int i=0;i<12;i++){
+    for(int i=0;i<15;i++){
         filelist.push_back(string("C:\\Users\\77470\\Desktop\\Data_mining\\chess")+QString::number(i+1).toStdString()+".jpg");
     }
     struc.calculate_Camera(filelist);
@@ -52,9 +52,10 @@ void MainWindow::on_pushButton_clicked()
 void MainWindow::on_pushButton_2_clicked()
 {
     std::vector<string> ImageNameList;
-    for(int i=0;i<16;i++)
+    for(int i=-7;i<8;i++)
         ImageNameList.push_back("C:\\Users\\77470\\Desktop\\Data_mining\\test"+QString::number(i+1).toStdString()+".jpg");
     struc.SetImage(ImageNameList);
+    qDebug()<<"SetImage Complete!";
 }
 
 void MainWindow::on_pushButton_3_clicked()
@@ -67,18 +68,18 @@ void MainWindow::on_pushButton_3_clicked()
 
 void MainWindow::on_pushButton_4_clicked()
 {
-    struc.AddStruct(front);
+    struc.AddStruct(front,ui->checkBox->isChecked());
     qDebug()<<"AddStruct Complete!";
 }
 
 
 void MainWindow::on_pushButton_5_clicked()
 {
-    struc.AddStruct(mid);
+    struc.AddStruct(mid,ui->checkBox->isChecked());
     qDebug()<<"AddStruct Complete!";
 }
 void MainWindow::on_pushButton_6_clicked()
 {
-    struc.AddStruct(back);
+    struc.AddStruct(back,ui->checkBox->isChecked());
     qDebug()<<"AddStruct Complete!";
 }
