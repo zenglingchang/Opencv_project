@@ -2,9 +2,10 @@
 
 Feature_Deal::Feature_Deal(cv::Mat &ima)
 {
-//    cv::cvtColor(ima,ima,CV_RGB2GRAY);c
-    ratio=std::sqrt((ima.cols*ima.rows)/500000);
-    cv::resize(ima,ima,cv::Size(ima.cols/ratio,ima.rows/ratio),0,0,INTER_AREA);
+    cv::Mat featureImage;
+//    cv::cvtColor(ima,ima,CV_RGB2GRAY);c/*
+//    ratio=std::sqrt((ima.cols*ima.rows)/500000);
+//    cv::resize(ima,ima,cv::Size(ima.cols/ratio,ima.rows/ratio),0,0,INTER_AREA);*/
     image=ima;
 //    cv::equalizeHist(image,result);
 //    cv::imshow("src",image);
@@ -15,6 +16,13 @@ Feature_Deal::Feature_Deal(cv::Mat &ima)
 //    Detector->detect(imageEnhance,keypoints);
     Detector->detect(image,keypoints);
     Detector->compute(image,keypoints,descriptors);
+    cv::drawKeypoints(image, // 原始图像
+                      keypoints, // 特征点的向量
+                      featureImage, // 生成图像
+                      cv::Scalar::all(-1), // 特征点的颜色
+                      cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS); // 标志位
+//    cv::imshow("src",image);
+//    cv::imshow("feature",featureImage);
 }
 
 
@@ -36,7 +44,7 @@ cv::Mat match_feature(Feature_Deal &a, Feature_Deal &b,vector<Point2f>& p1, vect
     }
 //    Mat mask=Mat::zeros(Size(rect.width/20+1,rect.height/20+1),CV_8UC1);
     for(auto match:temp)
-        if((match.distance<5 * max(min_dist, 10.0f))&&rec1.contains(a.keypoints[match.queryIdx].pt)&&rec2.contains(b.keypoints[match.trainIdx].pt)/*
+        if((match.distance<4 * max(min_dist, 10.0f))&&rec1.contains(a.keypoints[match.queryIdx].pt)&&rec2.contains(b.keypoints[match.trainIdx].pt)/*
                 mask.at<uchar>((a.keypoints[match.queryIdx].pt.y-rect.y)/20,(a.keypoints[match.queryIdx].pt.x-rect.x)/20)==0*/){
             matches.push_back(match);
 //            mask.at<uchar>((a.keypoints[match.queryIdx].pt.y-rect.y)/20,(a.keypoints[match.queryIdx].pt.x-rect.x)/20)=1;

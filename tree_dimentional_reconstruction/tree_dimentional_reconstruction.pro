@@ -28,21 +28,27 @@ SOURCES += \
         mainwindow.cpp \
     feature_deal.cpp \
     camera.cpp \
-    delaunay.cpp
+    delaunay.cpp \
+    structure.cpp \
+    leastsquare.cpp
 
 HEADERS += \
         mainwindow.h \
     feature_deal.h \
     help.h \
     camera.h \
-    delaunay.h
+    delaunay.h \
+    structure.h \
+    leastsquare.h
 
 FORMS += \
         mainwindow.ui
 
+INCLUDEPATH += D:\Qopencv\Eigen
 INCLUDEPATH += \
         D:\Qopencv\install\include
         D:\Qopencv\install\include\opencv
         D:\Qopencv\install\include\opencv2
+
 
 LIBS += -L D:\Qopencv\lib\libopencv_*.a
