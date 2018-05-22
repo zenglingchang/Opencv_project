@@ -9,7 +9,7 @@ void Camera::calibrate(std::vector<string> filelist)
 {
     //初始化
     int len=29;                             //棋盘每格为29mmX29mm
-    cv::Mat image;                          //存储图像
+    cv::Mat image,src;                          //存储图像
     std::vector<cv::Point2f> imageCorners;  //暂存二维角点
     std::vector<cv::Point3f> objectCorners; //暂存三维角点
     cv::Size boardSize(9,6);                //9*6的棋盘
@@ -22,13 +22,14 @@ void Camera::calibrate(std::vector<string> filelist)
             objectCorners.push_back(cv::Point3f((i+1)*len,(j+1)*len,0.0f));
 
     for(int i=0;i<filelist.size();i++){
-        image=cv::imread(filelist[i],0);
-        double ratio=std::sqrt((image.cols*image.rows)/500000);//棋盘缩小
-        qDebug()<<filelist[i].data();
-        qDebug()<<ratio<<"  "<<image.cols<<"  "<<image.rows;
-        cv::resize(image,image,cv::Size(image.cols/ratio,image.rows/ratio),0,0,INTER_AREA);
+        src=cv::imread(filelist[i]);
+        double ratio=std::sqrt((src.cols*src.rows)/500000);//棋盘缩小
+        cv::resize(src,src,cv::Size(src.cols/ratio,src.rows/ratio),0,0,INTER_AREA);
+        cv::cvtColor(src,image,CV_RGB2GRAY);
+//        qDebug()<<filelist[i].data();
+//        qDebug()<<ratio<<"  "<<image.cols<<"  "<<image.rows;
         //棋盘格角点检测
-        qDebug()<<i;
+//        qDebug()<<i;
         bool found=cv::findChessboardCorners(image,boardSize,imageCorners,CALIB_CB_ADAPTIVE_THRESH + CALIB_CB_NORMALIZE_IMAGE + CALIB_CB_FAST_CHECK);
         //若发现角点再进行亚精度像素角点检测
         if(found){
@@ -40,7 +41,10 @@ void Camera::calibrate(std::vector<string> filelist)
                     cv::TermCriteria(cv::TermCriteria::MAX_ITER+cv::TermCriteria::EPS, 30, 0.1));
             imagePoints.push_back(imageCorners);
             objectPoints.push_back(objectCorners);
-            qDebug()<<i;
+//            drawChessboardCorners(src,boardSize,imageCorners,true);
+//            cv::resize(src,src,cv::Size(src.cols/2,src.rows/2),0,0,INTER_AREA);
+//            cv::imshow("chess"+QString::number(i).toStdString(),src);
+//            qDebug()<<i;
         }
     }
 
