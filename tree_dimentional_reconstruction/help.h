@@ -1,5 +1,6 @@
 #ifndef HELP_H
 #define HELP_H
+#include<Eigen/Eigen>
 #include<opencv2/opencv.hpp>
 #include<opencv2/core/core.hpp>
 #include<opencv2/highgui/highgui.hpp>
@@ -7,6 +8,7 @@
 #include<opencv2/xfeatures2d.hpp>
 #include<opencv2/xfeatures2d/nonfree.hpp>
 #include<unordered_map>
+#include <opencv2/core/eigen.hpp>
 #include<map>
 #include <math.h>
 #include<QString>
